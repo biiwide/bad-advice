@@ -1,4 +1,4 @@
-(defproject biiwide/bad-advice "0.0.2"
+(defproject biiwide/bad-advice "0.0.3-SNAPSHOT"
 
   :description "This is probably a bad idea, but..."
 
@@ -11,5 +11,14 @@
   
   :profiles {:dev {:dependencies [[org.clojure/tools.logging "0.4.0"]]
                    }}
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version" "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag" "--no-sign"]
+                  ["deploy"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ["vcs" "push"]]
 
   )

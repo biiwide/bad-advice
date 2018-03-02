@@ -81,6 +81,18 @@ be defined and used at any time.
 "wakeup"
 ```
 
+### Deriving / Extending Advice
+Extend a group of generic advice macros `[:after :before :exception :finally]`
+into more specific advice `[:log/after :log/before :log/exception :log/finally]`.
+
+```clj
+(bad/extend-advice :log
+  "Log a formatted message using clojure.tools.logging/logf."
+  [:after :before :exception :finally]
+  (fn [advice]
+    `(clojure.tools.logging/logf advice)))
+```
+
 ## License
 
 Copyright © 2018 Theodore Cushman

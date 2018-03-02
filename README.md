@@ -7,6 +7,8 @@ This is for my own amusement and is likely a combination of several bad
 ideas.  So far this is strictly macro based, and not very dynamic.  You
 should probably consider using [Robert Hooke](https://github.com/technomancy/robert-hooke) instead.
 
+Dependency: `[biiwide.bad-advice "0.0.2"]`
+
 ## Usage
 ### Using in a function
 The `biiwide.bad-advice.alpha` namespace includes implementations of `fn` and `defn`

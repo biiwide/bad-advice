@@ -1,22 +1,28 @@
 (ns biiwide.bad-advice.alpha
-  (:refer-clojure :exclude [fn])
+  (:refer-clojure :exclude [defn fn])
   (:require [clojure.core :as c]))
 
 
-(defonce ^:private ADVICE-MACROS
+(c/defonce ^:private ADVICE-MACROS
   (atom {}))
 
 
-(defn register-advice-macro
+(c/defn- set-doc-string
+  [x doc-string]
+  (vary-meta x assoc :doc doc-string))
+
+
+(c/defn register-advice-macro!
   "Registers an advice macro for use."
-  [advice-key macro]
+  [advice-key doc-string macro]
   {:pre [(keyword? advice-key)
          (fn? macro)]}
-  (swap! ADVICE-MACROS assoc advice-key macro)
+  (swap! ADVICE-MACROS assoc advice-key
+         (set-doc-string macro doc-string))
   advice-key)
 
 
-(defn unregister-advice-macro
+(c/defn unregister-advice-macro!
   "Removes advice from the registry."
   [advice-key]
   {:pre [(keyword? advice-key)]}
@@ -24,15 +30,22 @@
   nil)
 
 
-(defn describe-advice-macros
+(c/defn advice-macro-doc
+  "Returns the documentation for an advice keyword."
+  [advice]
+  (cond (keyword? advice) (recur (get @ADVICE-MACROS advice))
+        (fn? advice) (:doc (meta advice))))
+
+
+(c/defn describe-advice-macros
   "Returns a map of all advice keywords and their documentation."
   []
   (reduce-kv (c/fn [result k mac]
-               (assoc result k (:doc (meta mac))))
+               (assoc result k (advice-macro-doc mac)))
              {} @ADVICE-MACROS))
 
 
-(defn- advise-with
+(c/defn- advise-with
   [body [advice-type form]]
   (if-some [adv-mac (get @ADVICE-MACROS advice-type)]
     (adv-mac form body)
@@ -42,8 +55,17 @@
         body)))
 
 
-(defmacro advise
-  "Wraps a form with advise"
+(c/defmacro advise
+  "Wraps a form with advise.
+Advice is proviced in a vector.  The same type
+of advice can be used multiple times.
+
+(let [a 123
+      b 456]
+  (advise [:after  (println \"Result:\" $)
+           :before (println \"A:\" a)
+           :before (println \"B:\" b)]
+    (+ a b)))"
   [advice-vec & body]
   (assert (vector? advice-vec))
   (assert (even? (count advice-vec)))
@@ -51,8 +73,11 @@
     (reduce advise-with (cons `do body) adv-pairs)))
 
 
-(defmacro fn
+(c/defmacro fn
   "Constructs an advised function.
+Just like 'clojure.core/fn, with added support for
+an optional advice vector in each arity.
+
 (fn fn-name [a b]
   [:after  (printf \"After:  %s <= (fn-name %s %s)\\n\" $ a b)
    :before (println \"-------\")
@@ -71,13 +96,29 @@
                 (list argv `(advise ~adv-vec ~@body)))))))
 
 
-(defmacro defadvice
+(c/defmacro defn
+  "Define an advised function.
+Just like 'clojure.core/defn, with added support for
+an optional advice vector in each arity."
+  [& defn-args]
+  (let [expanded (macroexpand-1 (cons `c/defn defn-args))
+        [head [[_ & fn-body]]] (split-with
+                                 (complement seq?)
+                                 expanded)]
+    `(~@head (fn ~@fn-body))))
+  
+
+(c/defn- add-doc
+  [x doc-string]
+  (vary-meta x assoc :doc doc-string))
+
+
+(c/defmacro defadvice
   [k doc-string binding body]
   {:pre [(= 2 (count binding))]}
-  `(register-advice-macro
-     ~k
-     (vary-meta (c/fn ~binding ~body)
-                assoc :doc ~doc-string)))
+  `(register-advice-macro!
+     ~k ~doc-string
+     (c/fn ~binding ~body)))
 
 
 (defadvice :before
@@ -104,22 +145,67 @@ have access to the returned value or any caught exceptions."
      (finally ~advice)))
 
 
-(defadvice :assert/before
-  "Perform an assertion before the body is evaluated."
+(defadvice :exception
+  "Evaluate advice when an exception is thrown.
+The exception will be bound as *e.
+This only catches Exceptions.  Errors and other
+Throwables are ignored."
   [advice body]
-  `(do ~(if (vector? advice)
-          `(assert ~@advice)
-          `(assert ~advice))
-       ~body))
+  
+  `(try ~body
+     (catch Exception ~'*e
+       ~advice
+       (throw ~'*e))))
 
 
-(defadvice :assert/after
-  "Perform an assertion after the body is evaluated.
-The result is bound to $."
-  [advice body]
-  `(let [~'$ ~body]
-     ~(if (vector? advice)
-        `(assert ~@advice)
-        `(assert ~advice))
-     ~'$))
+
+(c/defmacro extend-advice
+  "Extend existing advice.
+Allows for futher transformation of existing advice
+while maintaining the same relation to the form
+being extended.
+
+Documentation will be created by prepending the
+new doc-string to the doc-string for the parent
+advice.
+
+Example:  Extend both :before and :after advice,
+          creating :assert/before and :assert/after,
+          which will perform assertions.
+
+(extend-advice :assert
+   \"Perform an assertion.\"
+   [:after :before]
+   (fn [advice]
+     `(assert ~@advice)))"
+  [namespace-keyword doc-prefix advices advicefn]
+  (let [afn-sym  (gensym "afn")
+        adv-sym  (gensym "adv")
+        body-sym (gensym "body")]
+    `(let [~afn-sym ~advicefn]
+       ~@(for [parent-key advices]
+           (let [parent-doc (advice-macro-doc parent-key)
+                 child-key  (keyword (name namespace-keyword)
+                                     (name parent-key))]
+             `(defadvice ~child-key
+                ~(format "%s\n%s" doc-prefix parent-doc)
+                [~adv-sym ~body-sym]
+                `(advise ~[~parent-key (~afn-sym ~adv-sym)]
+                         ~~body-sym)))))))
+
+
+(extend-advice :assert
+   "Perform an assertion."
+   [:after :before]
+   (c/fn [advice]
+     (if (vector? advice)
+       `(assert ~@advice)
+       `(assert ~advice))))
+
+
+(extend-advice :clojure.tools.logging
+  "Log a formatted message using clojure.tools.logging/logf."
+  [:after :before :exception :finally]
+  (c/fn [advice]
+    (list* 'clojure.tools.logging/logf advice)))
 

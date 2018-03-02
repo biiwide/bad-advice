@@ -1,4 +1,4 @@
-# bad-advice
+# Bad Advice
 
 A library for defining and using AOP-style "advice" in functions
 and arbitrary pieces of code in Clojure.

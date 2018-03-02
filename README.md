@@ -90,7 +90,7 @@ into more specific advice `[:log/after :log/before :log/exception :log/finally]`
   "Log a formatted message using clojure.tools.logging/logf."
   [:after :before :exception :finally]
   (fn [advice]
-    `(clojure.tools.logging/logf advice)))
+    `(clojure.tools.logging/logf ~@advice)))
 ```
 
 ## License

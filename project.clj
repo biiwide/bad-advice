@@ -4,8 +4,8 @@
 
   :url "https://github.com/biiwide/bad-advice"
 
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :license {:name "Eclipse Public License 2.0"
+            :url "https://www.eclipse.org/legal/epl-2.0"}
 
   :dependencies [[org.clojure/clojure "1.8.0"]]
   

@@ -71,7 +71,7 @@ be defined and used at any time.
   `(let [begin# (System/currentTimeMillis)
          result# ~body
 	 end#   (System/currentTimeMillis)]
-    (printf ~advice (- end# beginE))
+    (printf ~advice (- end# begin#))
     result#))
 
 (bad/advise [:bad/timing "Slept for %sms\n"]
@@ -97,5 +97,4 @@ into more specific advice `[:log/after :log/before :log/exception :log/finally]`
 
 Copyright © 2018 Theodore Cushman
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the Eclipse Public License 2.0. See the LICENSE file for details.

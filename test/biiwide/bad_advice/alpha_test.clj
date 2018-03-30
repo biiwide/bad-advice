@@ -14,3 +14,30 @@
     (is (thrown? AssertionError (f 3 3)))
     (is (= 2/3 (f 2 3)))
     ))
+
+
+(deftest test-destructuring
+  (let [vresult (volatile! nil)
+        f (bad/fn foo
+                  ([] "Bye")
+                  ([{:keys [a b] :as m}]
+                    [:after (vreset! vresult $)]
+                    "Hi"))]
+    (= (f {}) @vresult)))
+
+(bad/defn defn-single
+  [abc]
+  [:before (println abc)
+   :after  (printf "(f %s) => %s\n" abc $)])
+
+
+(bad/defn defn-multi
+  ([] 0)
+  ([one]
+    [:before (println one)]
+    one)
+  ([one two]
+    [:before (printf "args: %s %s\n" one two)
+     :after  (printf "(f %s %s) => %s\n" one two $)]
+    (list one two)))
+

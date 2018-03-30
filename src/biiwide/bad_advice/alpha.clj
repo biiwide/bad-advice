@@ -73,6 +73,27 @@ of advice can be used multiple times.
     (reduce advise-with (cons `do body) adv-pairs)))
 
 
+(defn- parse-fn
+  [fn-form]
+  (if (seq (filter vector? fn-form))
+    (let [not-vec? (complement vector?)]
+      {:prelude (take-while not-vec? fn-form)
+       :arities (list (drop-while not-vec? fn-form))})
+    (let [not-list? (complement list?)]
+      {:prelude (take-while not-list? fn-form)
+       :arities (drop-while not-list? fn-form)})))
+
+
+(defn- advise-fn
+  [f badfn-form]
+  (let [{:keys [prelude arities]} (parse-fn badfn-form)]
+    (concat (cons f prelude)
+            (for [arity arities]
+              (let [[args & body] arity]
+                (if (vector? (first body))
+                  (list args (cons `advise body))
+                  arity))))))
+
 (c/defmacro fn
   "Constructs an advised function.
 Just like 'clojure.core/fn, with added support for
@@ -83,29 +104,16 @@ an optional advice vector in each arity.
    :before (println \"-------\")
    :before (printf \"Before: (fn-name %s %s)\\n\" a b)]
   (/a b))"
-  [& fn-args]
-  (let [exp-fn (macroexpand-1 (cons `c/fn fn-args))
-        [head arities] (split-with (complement seq?) exp-fn)]
-    (concat head
-            (for [arity arities]
-              (let [[argv & body] arity
-                    [adv-vec & body] (if (and (vector? (first body))
-                                              (not (empty? (next body))))
-                                       body
-                                       (cons [] body))]
-                (list argv `(advise ~adv-vec ~@body)))))))
+  [& fn-form]
+  (advise-fn `c/fn fn-form))
 
 
 (c/defmacro defn
   "Define an advised function.
 Just like 'clojure.core/defn, with added support for
 an optional advice vector in each arity."
-  [& defn-args]
-  (let [expanded (macroexpand-1 (cons `c/defn defn-args))
-        [head [[_ & fn-body]]] (split-with
-                                 (complement seq?)
-                                 expanded)]
-    `(~@head (fn ~@fn-body))))
+  [& defn-form]
+  (advise-fn `c/defn defn-form))
   
 
 (c/defn- add-doc

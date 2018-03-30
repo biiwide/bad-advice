@@ -1,4 +1,4 @@
-(defproject biiwide/bad-advice "0.0.4"
+(defproject biiwide/bad-advice "0.0.5-SNAPSHOT"
 
   :description "This is probably a bad idea, but..."
 
